@@ -1,41 +1,116 @@
-import multiprocessing
-import queue
+import os
 import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Dict
+import sqlite3
 
-# Correct relative import for your project structure:
-from backend.routes import agent_routes, feedback_routes
-from .config.config import settings
+# --- Configuration (using Pydantic BaseSettings) ---
+from pydantic import BaseSettings, Field
 
+class Settings(BaseSettings):
+    debug: bool = Field(default=False, env="DEBUG")
+    secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")  # You MUST change this
+    database_url: str = Field(default="sqlite:///./thinkalike.db", env="DATABASE_URL") # SQLite for dev
+    # Add other settings here as needed (e.g., API keys, model paths)
+
+    class Config:
+        env_file = ".env"  # Load environment variables from a .env file
+
+settings = Settings()
+
+# --- FastAPI Setup ---
 app = FastAPI(
-    title="ThinkAlike"
+    title="ThinkAlike API",
+    version="0.1.0",
+    description="API for the ThinkAlike platform.",
 )
 
-# CORS (Cross-Origin Resource Sharing) configuration - ALLOW ALL origins for now
-origins = ["*"]
+# --- CORS Configuration ---
+# IMPORTANT: For production, be more restrictive!
+origins = [
+    "http://localhost:3000",   # Allow your React development server
+    "https://thinkalike-project.onrender.com",  # Your *deployed* documentation site
+    "*" #remove this on production
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  #  Start with allowing all origins, restrict later
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],    #  Allow all methods
-    allow_headers=["*"],    #  Allow all headers
+    allow_methods=["*"],  # Allow all methods for development
+    allow_headers=["*"],  # Allow all headers for development
 )
 
-# Include your API routers
-app.include_router(agent_routes.router)
-app.include_router(feedback_routes.router)
+# --- Pydantic Models (Data Structures) ---
+# These define the structure of your data and are used for validation and documentation
+class User(BaseModel):
+    user_id: int
+    username: str
+    email: str
+    full_name: str | None = None  # Optional field
+    profile_picture_url: str | None = None
+    created_at: str
+    is_active: bool
+    bio: str | None = None
+    # Add other relevant fields as needed
 
-# Accessing configuration settings (for testing/demonstration - you can remove these later)
-print(f"Debug mode: {settings.debug}")
-print(f"Database URL: {settings.database_url}")
+    class Config:
+        orm_mode = True # To work directly with SQLAlchemy
 
-# VERY BASIC EXAMPLE ENDPOINT (replace with your actual data)
+class Profile(BaseModel): #You can add more fields as necessary
+    profile_id: int
+    user_id: int
+    bio: str
+    birthdate: str
+    location: str | None = None
+    profile_picture_url: str | None = None
+
+class Connection(BaseModel):
+    connection_id: int
+    user1_id: int
+    user2_id: int
+    status: str
+    created_at: str
+
+class ValueInterest(BaseModel): #Simplified example. You might need more tables
+    value_interest_id: int
+    user_id: int
+    category: str
+    value: str
+    importance: int
+
+class ConnectionStatus(BaseModel): #Example of a simple request body model
+    status: str
+
+# --- Database Interaction (using SQLite for now) ---
+DATABASE_FILE = "thinkalike.db"
+
+def get_db(): #Database connection
+    db = None
+    try:
+        db = sqlite3.connect(settings.database_url.replace("sqlite:///", "")) #Adapt the path
+        db.row_factory = sqlite3.Row  # Use Row factory to get dictionary-like results
+        yield db
+    finally:
+        if db:
+            db.close()
+
+# --- API Endpoints ---
 @app.get("/api/v1/graph")
-async def get_graph_data():
+async def get_graph_data(db: sqlite3.Connection = Depends(get_db)):
     # For now, return some static data.  Later, you'll fetch this from a database.
+    # This is just a *minimal* example to get you started.  You'll replace this
+    # with actual database queries.
+    cursor = db.cursor()
+    try:
+      cursor.execute("SELECT * FROM Users")
+      users = cursor.fetchall()
+      print(users) # So you can check that your database is working
+    except:
+      return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": "Error loading users table."})
+
     data = {
       "nodes": [
         { "id": 'node1', "label": 'User Input', "group": 1 , "value": "User data input"},
@@ -51,12 +126,36 @@ async def get_graph_data():
     }
     return data
 
-
 # TEMPORARY endpoint to simulate connection status changes
 @app.post("/api/v1/connection/status")
-async def set_connection_status(status: str):  # You'll likely want a Pydantic model here
+async def set_connection_status(status: ConnectionStatus):
     # In a real application, this would update the database
     # For now, we just return the status for testing purposes.
-    if status not in ["disconnected", "connecting", "connected"]:
-        return {"error": "Invalid status"}  # Basic validation
-    return {"status": status}
+    if status.status not in ["disconnected", "connecting", "connected"]:
+        raise HTTPException(status_code=400, detail="Invalid status")  # Use HTTPException
+    return {"status": status.status}
+
+# Placeholder endpoint for user registration
+@app.post("/api/v1/users", response_model=User) # Use the Pydantic model!
+async def create_user(user: User):
+  #TODO
+  return user
+
+# Placeholder endpoint for user login
+@app.post("/api/v1/auth/login")
+async def login_user():
+    # Placeholder - Implement JWT authentication here
+    return {"message": "Login (to be implemented)"}
+
+# Example of a protected endpoint (requires authentication)
+@app.get("/api/v1/users/{user_id}", response_model=User)
+async def get_user(user_id: int):
+  # Placeholder. In a real app, verify JWT and fetch user from DB
+    user = User(
+        user_id=user_id,
+        username=f"user{user_id}",  # Replace with data from your database
+        email="test@example.com",
+        created_at="2024-02-29T12:00:00Z",
+        is_active=True,
+    )
+    return user
