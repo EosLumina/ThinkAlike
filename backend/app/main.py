@@ -7,9 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.endpoints import agent_routes, feedback_routes
-# Correct relative import for your project structure:
-from backend.routes import agent_routes, feedback_routes
-from pydantic_settings import BaseSettings, Field
+from pydantic import BaseSettings, Field
 
 class Settings(BaseSettings):
     debug: bool = Field(default=False)
@@ -54,7 +52,7 @@ async def get_graph_data():
         "edges": [
             {"from": 'node1', "to": 'node2', "value": "User data"},
             {"from": 'node2', "to": 'node3', "value": "AI processed data"},
-            {"from": 'node3', "to": 'node4', "value": "Data for response"},
+            {"from": 'node3', "to": 'node4', "value": "Data for response"}
         ]
     }
     return data
