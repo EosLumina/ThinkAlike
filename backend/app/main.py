@@ -4,12 +4,8 @@ import os
 # Add the project root directory to the sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import multiprocessing
-import queue
-import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from app.endpoints import agent_routes, feedback_routes
 # Correct relative import for your project structure:
 from backend.routes import agent_routes, feedback_routes
