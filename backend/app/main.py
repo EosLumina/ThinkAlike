@@ -8,13 +8,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseSettings, Field, BaseModel
 
-from app.endpoints import agent_routes, feedback_routes
-
-class Settings(BaseSettings):
-    debug: bool = Field(default=False)
-    database_url: str = Field(...)
-
-settings = Settings(database_url=os.getenv("DATABASE_URL", "sqlite:///./test.db"))
+from backend.app.endpoints import agent_routes, feedback_routes
+from .config import settings  # Use settings defined in config.py
 
 app = FastAPI(
     title="ThinkAlike"
@@ -34,11 +29,12 @@ app.add_middleware(
 # Include your API routers
 app.include_router(agent_routes.router)
 app.include_router(feedback_routes.router)
-# Accessing configuration settings (for testing/demonstration - you can remove these later)
+
+# Accessing configuration settings for testing/demonstration
 if settings.debug:
     print(f"Debug mode: {settings.debug}")
-    print(f"Database URL: {settings.database_url}")
 print(f"Database URL: {settings.database_url}")
+
 # VERY BASIC EXAMPLE ENDPOINT (replace with your actual data)
 @app.get("/api/v1/graph")
 async def get_graph_data():
@@ -69,5 +65,5 @@ async def set_connection_status(status: ConnectionStatus):
         dict: A dictionary containing the status for testing purposes.
     """
     if status.status not in ["disconnected", "connecting", "connected"]:
-        raise HTTPException(status_code=400, detail="Invalid status")  # Basic validation
+        raise HTTPException(status_code=400, detail="Invalid status")
     return {"status": status.status}
