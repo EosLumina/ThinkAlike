@@ -15,7 +15,15 @@ app = FastAPI(
     title="ThinkAlike"
 )
 
-# CORS (Cross-Origin Resource Sharing) configuration - ALLOW ALL origins for now
+# filepath: /c:/Users/w_eed/Documents/thinkalike_project/ThinkAlike/backend/app/config.py
+from pydantic import BaseSettings, Field
+
+class Settings(BaseSettings):
+    debug: bool = Field(default=False)
+    database_url: str = Field(...)
+
+# This settings instance can be imported elsewhere
+settings = Settings(database_url="sqlite:///./test.db") # CORS (Cross-Origin Resource Sharing) configuration - ALLOW ALL origins for now
 origins = ["*"]
 
 app.add_middleware(
